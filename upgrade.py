@@ -96,7 +96,7 @@ class TextureUpgrader(wx.Frame):
         output_img = self.postprocess(output.squeeze(0).cpu())
 
         file_name, file_extension = os.path.splitext(file_path)
-        upgraded_file_path = file_name + "_upgraded" + file_extension
+        upgraded_file_path = file_name + "_upgraded.dds"
 
         if os.path.exists(upgraded_file_path):
             dlg = wx.MessageDialog(self, "The upgraded file already exists. Do you want to overwrite it?", "File Exists", wx.YES_NO | wx.ICON_QUESTION)
@@ -120,64 +120,8 @@ class TextureUpgrader(wx.Frame):
     def on_open_file(self, event):
         self.on_select(event)
 
-
-        def display_completion_message(self):
-        self.progress_bar.SetValue(0)
-        dlg = wx.MessageDialog(
-            self,
-            "Texture upgrade is complete.",
-            "Upgrade Complete",
-            wx.OK | wx.ICON_INFORMATION,
-        )
-        dlg.ShowModal()
-        dlg.Destroy()
-
-    
-           )
-        dlg.ShowModal()
-        dlg.Destroy()
-
-    def on_open_file(self, event):
-        self.on_select(event)
-
     def on_save_upgraded_image(self, event):
-        if self.upgraded_bitmap:
-            dialog = wx.FileDialog(
-                self,
-                "Save Upgraded Image",
-                style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT,
-                wildcard="PNG files (*.png)|*.png",
-            )
-            if dialog.ShowModal() == wx.ID_OK:
-                file_path = dialog.GetPath()
-                self.save_upgraded_image(file_path)
-                
-                
-    
-    def save_upgraded_image(self, file_path):
-            if self.upgraded_bitmap:
-                upgraded_image = self.upgraded_bitmap.ConvertToImage()
-                temp_file_path = os.path.splitext(file_path)[0] + ".png"
-                upgraded_image.SaveFile(temp_file_path, wx.BITMAP_TYPE_PNG)
-        
-    
-    upgraded_image = imageio.imread(temp_file_path)
-    imageio.imsave(file_path, upgraded_image, plugin="freeimage")
-        
-        os.remove(temp_file_path)
-        
-        dlg = wx.MessageDialog(
-            self,
-            "Upgraded image has been saved successfully.",
-            "Save Complete",
-            wx.OK | wx.ICON_INFORMATION,
-        )
-        dlg.ShowModal()
-        dlg.Destroy()
-    else:
-        dlg = wx.MessageDialog(
-            self, "No upgraded image to save.", "Save Error", wx.OK | wx.ICON_ERROR
-        )
+        dlg = wx.MessageDialog(self, "Saving back to the .dds format is not supported.", "Save Error", wx.OK | wx.ICON_ERROR)
         dlg.ShowModal()
         dlg.Destroy()
 
