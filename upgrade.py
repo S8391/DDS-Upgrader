@@ -2,6 +2,7 @@ import wx
 import os
 import threading
 import torch
+import imageio
 import torchvision.transforms as transforms
 from PIL import Image, ImageTk
 
@@ -36,23 +37,52 @@ class TextureUpgrader(wx.Frame):
 
         vbox.Add(hbox, 1, wx.EXPAND)
 
-        progress_bar = wx.Gauge(panel, -1, style=wx.GA_HORIZONTAL)
-        vbox.Add(progress_bar, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
+        self.progress_bar = wx.Gauge(panel, -1, style=wx.GA_HORIZONTAL)
+        vbox.Add(self.progress_bar, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
 
-        select_button = wx.Button(panel, -1, "Select File")
+        select_button = wx.Button(panel, -1, "Select Files")
         select_button.Bind(wx.EVT_BUTTON, self.on_select)
         vbox.Add(select_button, 0, wx.ALIGN_CENTER | wx.ALL, 10)
 
-        panel.SetSizer(vbox)
+        self.SetSizer(vbox)
+
+        self.file_paths = []
+
+        self.menu_bar = wx.MenuBar()
+        self.file_menu = wx.Menu()
+        self.open_recent_menu = wx.Menu()
+        self.save_menu = wx.Menu()
+
+        self.file_menu.Append(wx.ID_OPEN, "&Open File...\tCtrl+O")
+        self.file_menu.Append(wx.ID_SAVE, "&Save Upgraded Image...\tCtrl+S")
+        self.file_menu.Append(wx.ID_EXIT, "E&xit")
+
+        self.menu_bar.Append(self.file_menu, "&File")
+        self.menu_bar.Append(self.open_recent_menu, "Open &Recent")
+        self.menu_bar.Append(self.save_menu, "&Save")
+
+        self.SetMenuBar(self.menu_bar)
+
+        self.Bind(wx.EVT_MENU, self.on_open_file, id=wx.ID_OPEN)
+        self.Bind(wx.EVT_MENU, self.on_save_upgraded_image, id=wx.ID_SAVE)
+        self.Bind(wx.EVT_MENU, self.on_exit, id=wx.ID_EXIT)
 
     def on_select(self, event):
-        dialog = wx.FileDialog(self, "Select a DDS file", style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST, wildcard="DDS files (*.dds)|*.dds")
+        dialog = wx.FileDialog(self, "Select DDS Files", style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST | wx.FD_MULTIPLE, wildcard="DDS files (*.dds)|*.dds")
         if dialog.ShowModal() == wx.ID_OK:
-            file_path = dialog.GetPath()
-            self.upgrade_texture(file_path)
+            self.file_paths = dialog.GetPaths()
+            self.upgrade_textures()
         dialog.Destroy()
 
-    def upgrade_texture(self, file_path):
+    def upgrade_textures(self):
+        self.progress_bar.SetRange(len(self.file_paths))
+        self.progress_bar.SetValue(0)
+
+        for index, file_path in enumerate(self.file_paths):
+            thread = threading.Thread(target=self.upgrade_texture, args=(file_path, index))
+            thread.start()
+
+    def upgrade_texture(self, file_path, index):
         img = Image.open(file_path).convert("RGB")
         img_width, img_height = img.size
         if img_width > self.max_preview_width or img_height > self.max_preview_height:
@@ -76,35 +106,86 @@ class TextureUpgrader(wx.Frame):
 
         output_img.save(upgraded_file_path)
 
+        self.progress_bar.SetValue(index + 1)
+
+        if index == len(self.file_paths) - 1:
+            wx.CallAfter(self.display_completion_message)
+
+    def display_completion_message(self):
+        self.progress_bar.SetValue(0)
         dlg = wx.MessageDialog(self, "Texture upgrade is complete.", "Upgrade Complete", wx.OK | wx.ICON_INFORMATION)
         dlg.ShowModal()
         dlg.Destroy()
 
-        self.original_bitmap = wx.BitmapFromImage(wx.Image(file_path, wx.BITMAP_TYPE_ANY))
-        self.original_image_ctrl.SetBitmap(self.original_bitmap)
+    def on_open_file(self, event):
+        self.on_select(event)
 
-        self.upgraded_bitmap = wx.BitmapFromImage(wx.Image(upgraded_file_path, wx.BITMAP_TYPE_ANY))
-        self.upgraded_image_ctrl.SetBitmap(self.upgraded_bitmap)
 
-        self.display_image_info(file_path, upgraded_file_path)
-
-    def display_image_info(self, original_path, upgraded_path):
-        original_info = self.get_image_info(original_path)
-        upgraded_info = self.get_image_info(upgraded_path)
-
-        dlg = wx.MessageDialog(self, f"Original Image:\n\n{original_info}\n\nUpgraded Image:\n\n{upgraded_info}", "Image Information", wx.OK | wx.ICON_INFORMATION)
+        def display_completion_message(self):
+        self.progress_bar.SetValue(0)
+        dlg = wx.MessageDialog(
+            self,
+            "Texture upgrade is complete.",
+            "Upgrade Complete",
+            wx.OK | wx.ICON_INFORMATION,
+        )
         dlg.ShowModal()
         dlg.Destroy()
 
-    def get_image_info(self, file_path):
-        image = Image.open(file_path)
-        file_name = os.path.basename(file_path)
-        file_size = os.path.getsize(file_path)
-        width, height = image.size
-        mode = image.mode
+    
+           )
+        dlg.ShowModal()
+        dlg.Destroy()
 
-        return f"File Name: {file_name}\nFile Size: {file_size} bytes\nDimensions: {width} x {height}\nMode: {mode}"
+    def on_open_file(self, event):
+        self.on_select(event)
 
-app = wx.App()
-TextureUpgrader(None, "Texture Upgrader")
-app.MainLoop()
+    def on_save_upgraded_image(self, event):
+        if self.upgraded_bitmap:
+            dialog = wx.FileDialog(
+                self,
+                "Save Upgraded Image",
+                style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT,
+                wildcard="PNG files (*.png)|*.png",
+            )
+            if dialog.ShowModal() == wx.ID_OK:
+                file_path = dialog.GetPath()
+                self.save_upgraded_image(file_path)
+                
+                
+    
+    def save_upgraded_image(self, file_path):
+            if self.upgraded_bitmap:
+                upgraded_image = self.upgraded_bitmap.ConvertToImage()
+                temp_file_path = os.path.splitext(file_path)[0] + ".png"
+                upgraded_image.SaveFile(temp_file_path, wx.BITMAP_TYPE_PNG)
+        
+    
+    upgraded_image = imageio.imread(temp_file_path)
+    imageio.imsave(file_path, upgraded_image, plugin="freeimage")
+        
+        os.remove(temp_file_path)
+        
+        dlg = wx.MessageDialog(
+            self,
+            "Upgraded image has been saved successfully.",
+            "Save Complete",
+            wx.OK | wx.ICON_INFORMATION,
+        )
+        dlg.ShowModal()
+        dlg.Destroy()
+    else:
+        dlg = wx.MessageDialog(
+            self, "No upgraded image to save.", "Save Error", wx.OK | wx.ICON_ERROR
+        )
+        dlg.ShowModal()
+        dlg.Destroy()
+
+    def on_exit(self, event):
+        self.Close()
+
+
+if __name__ == "__main__":
+    app = wx.App()
+    TextureUpgrader(None, "Texture Upgrader")
+    app.MainLoop()
